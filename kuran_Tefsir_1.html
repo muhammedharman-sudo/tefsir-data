@@ -2463,7 +2463,7 @@ body{
     <button onclick="tefsirKaynakEkle()" style="width:100%;padding:10px;border:2px dashed var(--border);border-radius:10px;background:none;font-family:'Source Serif 4',serif;font-size:13px;color:var(--muted);cursor:pointer;margin-top:8px;">+ Yeni kaynak ekle</button>
   </div>
   <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;">
-    <button onclick="tefsirKaynaklariniKaydetVeYukle()" style="flex:1;padding:11px;border:none;border-radius:10px;background:var(--ink);color:var(--gold2);font-family:'Source Serif 4',serif;font-size:14px;font-weight:700;cursor:pointer;">✓ Kaydet & Yükle</button>
+    <button onclick="tefsirKaynaklariniKaydet()" style="flex:1;padding:11px;border:none;border-radius:10px;background:var(--ink);color:var(--gold2);font-family:'Source Serif 4',serif;font-size:14px;font-weight:700;cursor:pointer;">✓ Kaydet</button>
     <button onclick="tefsirKaynaklariKapat()" style="padding:11px 16px;border:1px solid var(--border);border-radius:10px;background:none;font-family:'Source Serif 4',serif;font-size:14px;color:var(--ink);cursor:pointer;">İptal</button>
   </div>
 </div>
@@ -13100,17 +13100,19 @@ function _tefsirKaynakListeRender() {
 
   kaynaklar.forEach((k, i) => {
     const satir = document.createElement('div');
-    satir.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;';
+    satir.style.cssText = 'border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;';
     satir.innerHTML = `
-      <div style="flex:1;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
         <input data-idx="${i}" data-field="sureNo" type="number" min="1" max="114" value="${k.sureNo||''}"
-          placeholder="Sure No (1-114)"
-          style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--paper2);font-family:'Source Serif 4',serif;font-size:13px;color:var(--ink);box-sizing:border-box;margin-bottom:6px;outline:none;">
-        <input data-idx="${i}" data-field="url" value="${k.url||''}"
-          placeholder="https://raw.githubusercontent.com/..."
-          style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--paper2);font-family:'Source Serif 4',serif;font-size:12px;color:var(--ink);box-sizing:border-box;outline:none;">
+          placeholder="Sure No"
+          style="width:80px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--paper2);font-family:'Source Serif 4',serif;font-size:13px;color:var(--ink);box-sizing:border-box;outline:none;">
+        <span style="font-size:12px;color:var(--muted);flex:1;">${k.sureNo ? 'Sure ' + k.sureNo : 'Sure seçilmedi'}</span>
+        <button onclick="_tefsirKaynakSil(${i})" style="padding:5px 8px;border:1px solid var(--border);border-radius:8px;background:none;font-size:13px;cursor:pointer;color:var(--muted);">🗑</button>
       </div>
-      <button onclick="_tefsirKaynakSil(${i})" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:none;font-size:14px;cursor:pointer;color:var(--muted);flex-shrink:0;margin-top:2px;">🗑</button>`;
+      <input data-idx="${i}" data-field="url" value="${k.url||''}"
+        placeholder="https://raw.githubusercontent.com/..."
+        style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--paper2);font-family:'Source Serif 4',serif;font-size:12px;color:var(--ink);box-sizing:border-box;outline:none;margin-bottom:8px;">
+      <button onclick="_tekSureYukle(${i})" style="width:100%;padding:8px;border:none;border-radius:8px;background:var(--ink);color:var(--gold2);font-family:'Source Serif 4',serif;font-size:13px;font-weight:600;cursor:pointer;">⬇ Bu Sureyi Yükle</button>`;
     liste.appendChild(satir);
   });
 }
@@ -13133,8 +13135,36 @@ function _tefsirKaynaklariGetir() {
   try { return JSON.parse(localStorage.getItem('tefsir_kaynaklar') || '[]'); } catch(e) { return []; }
 }
 
-async function tefsirKaynaklariniKaydetVeYukle() {
-  // Formdaki değerleri oku
+async function _tekSureYukle(idx) {
+  // Formdaki güncel değerleri oku
+  const sureNoInp = document.querySelector(`input[data-idx="${idx}"][data-field="sureNo"]`);
+  const urlInp = document.querySelector(`input[data-idx="${idx}"][data-field="url"]`);
+  if (!sureNoInp || !urlInp) return;
+
+  const sureNo = parseInt(sureNoInp.value);
+  const url = urlInp.value.trim();
+
+  if (!sureNo || !url) { alert('Sure numarası ve URL giriniz.'); return; }
+
+  // Önce kaydet
+  const kaynaklar = _tefsirKaynaklariGetir();
+  if (kaynaklar[idx]) { kaynaklar[idx].sureNo = sureNo; kaynaklar[idx].url = url; }
+  localStorage.setItem('tefsir_kaynaklar', JSON.stringify(kaynaklar));
+
+  const onay = confirm('Sure ' + sureNo + ' için "Tefsir" notları GitHub\'dan çekilecek ve üzerine yazılacak. Devam edilsin mi?');
+  if (!onay) return;
+
+  try {
+    const r = await fetch(url);
+    if (!r.ok) { alert('Yüklenemedi: ' + url); return; }
+    const metin = await r.text();
+    const sayi = _githubTefsirYukle(sureNo, metin);
+    alert('✅ Sure ' + sureNo + ': ' + sayi + ' ayet tefsiri yüklendi!');
+    _tefsirKaynakListeRender();
+  } catch(e) { alert('Hata: ' + e.message); }
+}
+
+function tefsirKaynaklariniKaydet() {
   const inputs = document.querySelectorAll('#tefsir-kaynak-liste input');
   const kaynaklar = _tefsirKaynaklariGetir();
   inputs.forEach(inp => {
@@ -13142,24 +13172,9 @@ async function tefsirKaynaklariniKaydetVeYukle() {
     const field = inp.dataset.field;
     if (kaynaklar[idx]) kaynaklar[idx][field] = inp.value.trim();
   });
-  // Boş olanları temizle
   const temiz = kaynaklar.filter(k => k.sureNo && k.url);
   localStorage.setItem('tefsir_kaynaklar', JSON.stringify(temiz));
-
   tefsirKaynaklariKapat();
-
-  // Yükle
-  let toplam = 0;
-  for (const k of temiz) {
-    try {
-      const r = await fetch(k.url);
-      if (!r.ok) { alert('Yüklenemedi: ' + k.url); continue; }
-      const metin = await r.text();
-      const sayi = _githubTefsirYukle(parseInt(k.sureNo), metin);
-      toplam += sayi;
-    } catch(e) { alert('Hata: ' + k.url + '\n' + e.message); }
-  }
-  if (toplam > 0) alert('✅ ' + toplam + ' ayet tefsiri yüklendi!');
 }
 
 // ════════════════════════════════════════
@@ -13230,29 +13245,9 @@ async function _githubTefsirleriniCek() {
   }
 }
 
-// Sayfa açılışında hem sabit listedeki hem localStorage'daki kaynakları yükle
-async function _tumTefsirleriniCek() {
-  // 1. Sabit liste (kod içi)
-  await _githubTefsirleriniCek();
-  // 2. Kullanıcının UI'dan kaydettiği kaynaklar
-  const kaynaklar = (() => { try { return JSON.parse(localStorage.getItem('tefsir_kaynaklar') || '[]'); } catch(e) { return []; } })();
-  for (const k of kaynaklar) {
-    if (!k.sureNo || !k.url) continue;
-    try {
-      const r = await fetch(k.url);
-      if (!r.ok) { console.warn('Tefsir yüklenemedi:', k.url); continue; }
-      const metin = await r.text();
-      const sayi = _githubTefsirYukle(parseInt(k.sureNo), metin);
-      console.log('✅ Sure ' + k.sureNo + ': ' + sayi + ' ayet yüklendi (kayıtlı kaynak).');
-    } catch(e) { console.warn('Tefsir hatası:', k.url, e); }
-  }
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', _tumTefsirleriniCek);
-} else {
-  _tumTefsirleriniCek();
-}
+// Sayfa açılışında GitHub'dan ÇEKMEZ.
+// Notlar localStorage'da kalıcı olarak durur.
+// Sadece "Kaydet & Yükle" butonuna basınca GitHub'dan çeker.
 
 // ════════════════════════════════════════
 // Markdown araç çubuğuna geri al / yeniden yap ekle
