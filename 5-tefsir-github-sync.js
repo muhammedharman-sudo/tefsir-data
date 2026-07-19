@@ -1003,15 +1003,15 @@ function _tefsirKaynakListeRender() {
     satir.innerHTML = `
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
         <input data-idx="${i}" data-field="sureNo" type="number" min="1" max="114" value="${k.sureNo||''}"
-          placeholder="Sure No"
-          style="width:80px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--paper2);font-family:'Source Serif 4',serif;font-size:13px;color:var(--ink);box-sizing:border-box;outline:none;">
-        <span style="font-size:12px;color:var(--muted);flex:1;">${k.sureNo ? 'Sure ' + k.sureNo : 'Sure seçilmedi'}</span>
+          placeholder="Sure No (boş=tüm Kur'an)"
+          style="width:150px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--paper2);font-family:'Source Serif 4',serif;font-size:13px;color:var(--ink);box-sizing:border-box;outline:none;">
         <button onclick="_tefsirKaynakSil(${i})" style="padding:5px 8px;border:1px solid var(--border);border-radius:8px;background:none;font-size:13px;cursor:pointer;color:var(--muted);">🗑</button>
       </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Sure No boş bırakılırsa, dosyadaki TÜM sureler "N- SURE" başlıklarından otomatik ayrılıp yüklenir.</div>
       <input data-idx="${i}" data-field="url" value="${k.url||''}"
         placeholder="https://raw.githubusercontent.com/..."
         style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--paper2);font-family:'Source Serif 4',serif;font-size:12px;color:var(--ink);box-sizing:border-box;outline:none;margin-bottom:8px;">
-      <button onclick="_tekSureYukle(${i})" style="width:100%;padding:8px;border:none;border-radius:8px;background:var(--ink);color:var(--gold2);font-family:'Source Serif 4',serif;font-size:13px;font-weight:600;cursor:pointer;">⬇ Bu Sureyi Yükle</button>`;
+      <button onclick="_tekSureYukle(${i})" style="width:100%;padding:8px;border:none;border-radius:8px;background:var(--ink);color:var(--gold2);font-family:'Source Serif 4',serif;font-size:13px;font-weight:600;cursor:pointer;">⬇ Bu Kaynağı Yükle</button>`;
     liste.appendChild(satir);
   });
 }
@@ -1040,16 +1040,39 @@ async function _tekSureYukle(idx) {
   const urlInp = document.querySelector(`input[data-idx="${idx}"][data-field="url"]`);
   if (!sureNoInp || !urlInp) return;
 
-  const sureNo = parseInt(sureNoInp.value);
+  const sureNoStr = sureNoInp.value.trim();
   const url = urlInp.value.trim();
 
-  if (!sureNo || !url) { alert('Sure numarası ve URL giriniz.'); return; }
+  if (!url) { alert('URL giriniz.'); return; }
 
   // Önce kaydet
   const kaynaklar = _tefsirKaynaklariGetir();
-  if (kaynaklar[idx]) { kaynaklar[idx].sureNo = sureNo; kaynaklar[idx].url = url; }
+  if (kaynaklar[idx]) { kaynaklar[idx].sureNo = sureNoStr; kaynaklar[idx].url = url; }
   localStorage.setItem('tefsir_kaynaklar', JSON.stringify(kaynaklar));
 
+  // Sure No boşsa: ÇOKLU SURE (tüm Kur'an) modu
+  if (!sureNoStr) {
+    const onay = confirm('Bu dosyadaki TÜM sureler başlıklarından otomatik ayrılıp, her birinin ayet-altı Notlarına yüklenecek. Devam edilsin mi?');
+    if (!onay) return;
+
+    try {
+      const r = await fetch(url);
+      if (!r.ok) { alert('Yüklenemedi: ' + url); return; }
+      const metin = await r.text();
+      const sonuclar = _githubTefsirCokluYukle(metin);
+      if (sonuclar.length === 0) {
+        alert('⚠️ Hiç sure başlığı bulunamadı. Dosya formatını kontrol edin (başlıklar "N- SURE" şeklinde olmalı).');
+      } else {
+        const toplamAyet = sonuclar.reduce((t, s) => t + s.ayetSayisi, 0);
+        alert('✅ ' + sonuclar.length + ' sure, toplam ' + toplamAyet + ' ayet yüklendi!');
+      }
+      _tefsirKaynakListeRender();
+    } catch(e) { alert('Hata: ' + e.message); }
+    return;
+  }
+
+  // Tek sure modu (eski davranış)
+  const sureNo = parseInt(sureNoStr);
   const onay = confirm('Sure ' + sureNo + ' için "Tefsir" notları GitHub\'dan çekilecek ve üzerine yazılacak. Devam edilsin mi?');
   if (!onay) return;
 
@@ -1259,6 +1282,21 @@ function _githubTefsirYukle(sureNo, metin) {
   }
 
   return yuklenenSayisi;
+}
+
+// ════════════════════════════════════════
+//  ÇOKLU SURE (TÜM KUR'AN TEK DOSYA) — NOTLAR SİSTEMİ İÇİN
+//  Tek dosyada tüm sureler varsa, "N- SURE" başlıklarından otomatik ayırıp
+//  her sureyi kendi ayet-altı Notlar'ına (an_SURE_AYET) yükler.
+// ════════════════════════════════════════
+function _githubTefsirCokluYukle(metin) {
+  const parcalar = _alimTefsirCoklaAyir(metin); // mevcut Tefsir sekmesi ayırıcısını yeniden kullan
+  const sonuclar = [];
+  parcalar.forEach(p => {
+    const sayi = _githubTefsirYukle(p.sureNo, p.metin);
+    if (sayi > 0) sonuclar.push({ sureNo: p.sureNo, ayetSayisi: sayi });
+  });
+  return sonuclar;
 }
 
 // Sayfa yüklenince GitHub dosyalarını çek
