@@ -244,12 +244,12 @@ function _alimTefsirYukle(alim, sureNo, metin) {
 // ════════════════════════════════════════
 function _alimTefsirCoklaAyir(metin) {
   const satirlar = metin.split('\n');
-  // 1. adım: "SÜRESİ" geçen satırları bul (OCR bazen sayı ile SÜRESİ kelimesini ayrı satırlara koyabiliyor)
-  const suresiSatirRegex = /S[UÜ]RES[İI]/;
+  // 1. adım: "SÜRESİ" / "Sûresi" geçen satırları bul (büyük/küçük harf ve û/ü farkı önemsiz)
+  const suresiSatirRegex = /S[UÜÛ]RES[İI]/i;
   // Sayı satırı: sadece "5-" veya "5." gibi kısa bir satır (başka metin içermeyen)
   const sadeceSayiRegex = /^(\d{1,3})[\-\.]?\s*$/;
-  // Aynı satırda hem sayı hem SÜRESİ: "5- MÂİDE SÜRESİ" veya "5. MÂİDE SÜRESİ"
-  const sayiVeSuresiAyniSatir = /^(\d{1,3})[\-\.]\s*[A-ZÂÎÛÜÇĞİÖŞa-zâîûüçğıöş'\- ]*S[UÜ]RES[İI]/;
+  // Aynı satırda hem sayı hem SÜRESİ: "5- MÂİDE SÜRESİ" veya "114- Nâs Sûresi Tefsiri"
+  const sayiVeSuresiAyniSatir = /^(\d{1,3})[\-\.]\s*[A-ZÂÎÛÜÇĞİÖŞa-zâîûüçğıöş'\- ]*S[UÜÛ]RES[İI]/i;
 
   const sureSinirlari = []; // {sureNo, satirIndex}
   for (let i = 0; i < satirlar.length; i++) {
