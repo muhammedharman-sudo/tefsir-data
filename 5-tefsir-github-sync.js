@@ -1318,34 +1318,23 @@ function _githubTefsirYukle(sureNo, metin) {
   let match;
   let yuklenenSayisi = 0;
 
+  if (!window._bellekTefsirVerisi) window._bellekTefsirVerisi = {};
+  if (!window._bellekTefsirKaynaklar) window._bellekTefsirKaynaklar = {};
+  window._bellekTefsirVerisi[sureNo] = {};
+
   while ((match = regex.exec(metin)) !== null) {
     const ayetNo = parseInt(match[1]);
     const icerik = match[2].trim();
     if (!icerik) continue;
 
-    const key = 'an_' + sureNo + '_' + ayetNo;
-
-    // Mevcut notları al
-    let arr = [];
-    try { arr = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { arr = []; }
-
-    // "GitHub Tefsiri" adlı not zaten varsa güncelle, yoksa ekle
-    const mevcutIdx = arr.findIndex(n => n.isim === 'Tefsir');
-    const yeniNot = {
-      isim: 'Tefsir',
-      icerik: icerik,
-      tarih: new Date().toLocaleDateString('tr-TR', {day:'2-digit', month:'2-digit', year:'numeric'})
-    };
-
-    if (mevcutIdx >= 0) {
-      arr[mevcutIdx] = yeniNot; // güncelle
-    } else {
-      arr.unshift(yeniNot); // en başa ekle
-    }
-
-    localStorage.setItem(key, JSON.stringify(arr));
+    // localStorage'a YAZMIYORUZ artık — sadece bellek (RAM) cache'ine yazılır.
+    // Kayıt anında GitHub'a zaten yazıldığı için burada tekrar dosyaya yazmaya gerek yok,
+    // sadece görüntülemek için bellekte tutuyoruz.
+    window._bellekTefsirVerisi[sureNo][ayetNo] = icerik;
     yuklenenSayisi++;
   }
+
+  if (yuklenenSayisi > 0) window._bellekTefsirKaynaklar[sureNo] = true;
 
   return yuklenenSayisi;
 }
