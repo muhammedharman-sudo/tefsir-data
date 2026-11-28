@@ -88,7 +88,22 @@
         if (!meal[anahtar] && typeof _ayetEmbedGetir === 'function') _ayetEmbedGetir(r.sure, r.ayet).then((x) => { meal[anahtar] = String(x.meal || '').replace(/\[\d+\]/g, '').trim(); m.textContent = meal[anahtar]; }).catch(() => {});
       });
     };
+    const gez = el('button', 'ka-ok', '📖 Bu listeyi tefsirde sırayla gez'); gez.onclick = () => { const q = foldTr(ara.value.trim()); const l = api.liste().reverse().filter((r) => (!secKonu || r.konu === secKonu) && (!q || foldTr(ref(r.sure, r.ayet) + ' ' + (meal[r.sure + ':' + r.ayet] || '')).indexOf(q) >= 0)); if (!l.length || !window.TefsirKarsilastir) return; P.kapat(); window.TefsirKarsilastir.klasorAc(l.map((r) => ({ s: r.sure, a: r.ayet })), '★ Kayıtlılar'); };
+    P.k.appendChild(gez);
     ara.oninput = ciz; ciz();
+  }
+
+  /* ── klasör modu seçici: bir klasörü seç → ◀ ▶ yalnız onun âyetlerinde gezer ── */
+  function klasorSec() {
+    const K = window.KutKume && window.KutKume.tefsir; if (!K) return;
+    const P = pencere('📂 Klasörden gez'); const kon = K.konular();
+    P.k.appendChild(el('div', 'ka-bos', 'Bir klasör seçin: ◀ ▶ okları yalnız o klasördeki âyetler arasında gezinir. Çıkmak için üstteki şeritte ✕.')).style.padding = '0 0 6px';
+    const api = KK(); const kayit = api ? api.liste() : [];
+    if (!kon.length) P.k.appendChild(el('div', 'ka-bos', 'Henüz klasör yok.'));
+    kon.forEach((k) => {
+      const b = el('button', 'ka-sec', k.emoji + ' ' + k.ad + '  ·  ' + k.say + ' âyet'); b.disabled = !k.say; if (!k.say) b.style.opacity = '.5';
+      b.onclick = () => { P.kapat(); K.konu(k.id); }; P.k.appendChild(b);
+    });
   }
 
   /* ── Karşılaştır ekranındaki çubuk ── */
@@ -97,14 +112,15 @@
     const mevcut = api.var(s, a);
     let ad = '';
     if (mevcut) { const k = api.konular().find((x) => x.id === mevcut.konu); ad = k ? k.emoji + ' ' + k.ad : ''; }
-    const b = el('button', mevcut ? 'kayitli' : '', mevcut ? '★ ' + (ad || 'Kayıtlı') + ' ▾' : '☆ Kaydet');
+    const b = el('button', mevcut ? 'kayitli' : '', mevcut ? (ad ? '★ ' + ad.replace(/^\S+ /, '') + ' ▾' : '★ Kayıtlı ▾') : '☆ Kaydet');
     b.onclick = () => {
       if (mevcut) { klasorSecici(s, a); return; }
       const son = api.sonKonu(); api.ekle(s, a, son); toast('⭐ Kaydedildi'); yenileEkran();
     };
     const n = api.liste().length;
     const l = el('button', null, '★ Kayıtlılar (' + n + ')'); l.onclick = kayitliListe;
-    w.appendChild(b); w.appendChild(l); return w;
+    const g = el('button', null, '📂 Klasörden gez'); g.onclick = klasorSec;
+    w.appendChild(b); w.appendChild(l); w.appendChild(g); return w;
   }
 
   window.KayitliAyet = { cubuk, liste: kayitliListe, klasorSecici };
